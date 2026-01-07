@@ -2,6 +2,16 @@
 #define RMDI_INCLUDE_H
 
 /*
+ * NOTE BEFORE USING:
+ * This is not fucking thread-safe!
+ * What, you though I could optimize this shit for
+ * thread safety when my stupid fuck-ass can barely
+ * even write a memory debugger? Get fucken real!
+ *
+ * So yeah, user beware...
+ */
+
+/*
  * TODO at some point:
  * I might wanna find a way for the user
  * to define a single macro to completely
