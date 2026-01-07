@@ -34,8 +34,8 @@ int main(void)
         rmd_u8   inds[13u] = { 0u };
 
         srand(time(NULL));
-        rose_mem_debugger_init(RMDF_PRINT_USAGE_AT_EXIT |
-                               RMDF_PRINT_HEAP_CALLS);
+        // rose_mem_debugger_init(RMDF_PRINT_HEAP_CALLS);
+        rose_mem_debugger_init(RMDF_NONE);
 
         allocs = malloc(sizeof(*allocs) * alloc_cnt);
 
@@ -46,7 +46,7 @@ int main(void)
         for (rmd_u8 i = 0u; i < alloc_cnt; ++i)
                 free(allocs[i]);
 
-        free(allocs);
+        // free(allocs);
 
         rose_mem_debugger_terminate();
 

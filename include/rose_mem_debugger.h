@@ -2,6 +2,18 @@
 #define RMDI_INCLUDE_H
 
 /*
+ * TODO at some point:
+ * I might wanna find a way for the user
+ * to define a single macro to completely
+ * disable the compilation of this translation
+ * unit until they actually want it.
+ *
+ * Something like RMD_DISABLE_ALL_FUNCTIONALITY
+ * or whatever should do the trick, but I'm not *super*
+ * worried about it right now.
+ */
+
+/*
  * There are some configuration macros you can use that will
  * allow you to enable or disable certain things about the API.
  *
@@ -11,6 +23,7 @@
  * - RMD_DISABLE_ASSERTS
  * - RMD_MAX_ALLOCS
  * - RMD_STRICT_FREE
+ * - RMD_FREE_ALL_SLOTS_ON_TERMINATE
  *
  * Although, I haven't fully planned this out yet, so feel
  * free to look through the code for right now. lmao
@@ -26,9 +39,9 @@
 #define RMD_UNUSED __attribute__((unused))
 #endif /* RMD_UNUSED */
 
-#ifndef RMDI_MAX_ALLOCS
-#define RMDI_MAX_ALLOCS 4096
-#endif /* RMDI_MAX_ALLOCS */
+#ifndef RMD_MAX_ALLOCS
+#define RMD_MAX_ALLOCS 4096
+#endif /* RMD_MAX_ALLOCS */
 
 /* Unsigned types */
 typedef unsigned char  rmd_u8;
@@ -54,10 +67,9 @@ typedef enum {
 
 /* Initialization flags */
 typedef enum {
-        RMDF_PRINT_USAGE_AT_EXIT = (1u << 0u),
-        RMDF_PRINT_HEAP_CALLS    = (1u << 1u),
-        RMD_FLAG_MASK            = (RMDF_PRINT_USAGE_AT_EXIT |
-                                    RMDF_PRINT_HEAP_CALLS)
+        RMDF_NONE                = (0u),
+        RMDF_PRINT_HEAP_CALLS    = (1u << 0u),
+        RMD_FLAG_MASK            = (RMDF_PRINT_HEAP_CALLS)
 } rmd_flags_e;
 
 /* Function macros */
@@ -107,7 +119,7 @@ extern rmd_void rmd_print_heap_usage(void);
  * this on when committing, so I am just making a note
  * of this stupid bullshit right now. lmfao
  */
-#if 1
+#if 0
 #define RMD_IMPLEMENTATION
 #endif
 
@@ -121,9 +133,11 @@ extern rmd_void rmd_print_heap_usage(void);
 
 /* Implementation types and structs */
 struct rmdi_allocation {
-        rmd_void *ptr;
-        rmd_size  size;
-        rmd_bool  in_use;
+        rmd_void   *ptr;
+        rmd_size    size;
+        rmd_bool    in_use;
+        const char *file;
+        int         line;
 };
 
 /* Implementation static variables */
@@ -131,7 +145,7 @@ static rmd_bool               rmdi_is_init                      = RMD_FALSE;
 static rmd_flags_e            rmdi_flags                        = 0u;
 static rmd_size               rmdi_bytes_allocated              = 0u;
 static rmd_size               rmdi_num_allocations              = 0u;
-static struct rmdi_allocation rmdi_allocations[RMDI_MAX_ALLOCS] = { 0u };
+static struct rmdi_allocation rmdi_allocations[RMD_MAX_ALLOCS]  = { 0u };
 
 /* Implementation function definitions */
 #ifdef RMD_DISABLE_ASSERTS
@@ -187,13 +201,10 @@ rmd_void rose_mem_debugger_init(const rmd_flags_e flags)
         rmd_assertm(!rmdi_is_init,
                     "Rose Mem Debugger was already initialized!\n");
 
-        if (flags & RMDF_PRINT_USAGE_AT_EXIT)
-                atexit(&rmd_print_heap_usage);
-
         rmdi_bytes_allocated = 0u;
         rmdi_num_allocations = 0u;
         memset(rmdi_allocations, 0,
-               RMDI_MAX_ALLOCS * sizeof(*rmdi_allocations));
+               RMD_MAX_ALLOCS * sizeof(*rmdi_allocations));
 
         rmdi_flags   = flags;
         rmdi_is_init = RMD_TRUE;
@@ -204,7 +215,23 @@ rmd_void rose_mem_debugger_terminate(void)
         rmd_assertm(rmdi_is_init,
                     "Rose Mem Debugger was never initialized; can't free!\n");
 
-        for (rmd_size i = 0u; i < RMDI_MAX_ALLOCS; ++i) {
+        /*
+         * This function *does* free all the stuff that was
+         * current allocated, but before doing that, it's usually
+         * a good idea to make sure that we see how much memory
+         * *was* in use before it was flushed out so we can
+         * go back and fix that!
+         */
+        rmd_print_heap_usage();
+
+        /*
+         * FIXME:
+         * I'm going to be honest, I'm not 100% sure if I want
+         * this program to flush out all the memory. It does for
+         * now, but I'm honestly not sure where to go from here. :/
+         */
+#ifdef RMD_FREE_ALL_SLOTS_ON_TERMINATE
+        for (rmd_size i = 0u; i < RMD_MAX_ALLOCS; ++i) {
                 struct rmdi_allocation *a;
 
                 a = rmdi_allocations + i;
@@ -222,6 +249,7 @@ rmd_void rose_mem_debugger_terminate(void)
                         a->in_use = RMD_FALSE;
                 }
         }
+#endif /* RMD_FREE_ALL_SLOTS_ON_TERMINATE */
 
         rmdi_bytes_allocated = 0u;
         rmdi_num_allocations = 0u;
@@ -231,7 +259,7 @@ rmd_void rose_mem_debugger_terminate(void)
 
 static struct rmdi_allocation *_rmdi_get_first_available_slot(void)
 {
-        for (rmd_size i = 0u; i < RMDI_MAX_ALLOCS; ++i) {
+        for (rmd_size i = 0u; i < RMD_MAX_ALLOCS; ++i) {
                 struct rmdi_allocation *a;
 
                 a = rmdi_allocations + i;
@@ -279,14 +307,8 @@ rmd_void *_rmdi_malloc_internal(rmd_size sz, const char *file_name,
         rmdi_bytes_allocated += sz;
         a->size = sz;
 
-        /*
-         * FIXME: This should print out a whole page of
-         * debug shit including all the currently allocated
-         * blocks, where (and possibly when) they were allocated,
-         * and probably some other shit. This is more for later though
-         */
         ++rmdi_num_allocations;
-        rmd_assertf(rmdi_num_allocations < RMDI_MAX_ALLOCS,
+        rmd_assertf(rmdi_num_allocations < RMD_MAX_ALLOCS,
                     "Too many allocations (%lu)!\n", rmdi_num_allocations);
 
         if (rmdi_flags & RMDF_PRINT_HEAP_CALLS) {
@@ -296,6 +318,8 @@ rmd_void *_rmdi_malloc_internal(rmd_size sz, const char *file_name,
         }
 
         a->in_use = RMD_TRUE;
+        a->file   = file_name;
+        a->line   = line_num;
 
         return a->ptr;
 }
@@ -323,7 +347,7 @@ rmd_void _rmdi_free_internal(rmd_void *ptr, const char *file_name,
          * This could be a subject of premature optimization, so
          * don't worry about it too much for now. :D
          */
-        for (rmd_size i = 0u; i < RMDI_MAX_ALLOCS; ++i) {
+        for (rmd_size i = 0u; i < RMD_MAX_ALLOCS; ++i) {
                 struct rmdi_allocation *a;
 
                 a = rmdi_allocations + i;
@@ -356,7 +380,7 @@ rmd_void rmd_print_heap_usage(void)
         rmd_size bytes_counted  = 0u;
         rmd_size allocs_counted = 0u;
 
-        for (rmd_size i = 0u; i < RMDI_MAX_ALLOCS; ++i) {
+        for (rmd_size i = 0u; i < RMD_MAX_ALLOCS; ++i) {
                 struct rmdi_allocation *a;
 
                 a = rmdi_allocations + i;
@@ -380,6 +404,25 @@ rmd_void rmd_print_heap_usage(void)
 
         printf("RMD Heap Usage: %lu bytes across %lu allocations.\n",
                bytes_counted, allocs_counted);
+
+        /*
+         * If no memory was left over, then we're done here.
+         * Otherwise, we print out all the blocks that were
+         * still allocated on the heap!
+         */
+        if (!bytes_counted && !allocs_counted)
+                return;
+
+        for (rmd_size i = 0u; i < RMD_MAX_ALLOCS; ++i) {
+                struct rmdi_allocation *a;
+
+                a = rmdi_allocations + i;
+                if (!a->in_use)
+                        continue;
+
+                printf("LEAK: [s%lu] -> %lu B -> <%p> -> [%s:%d]\n",
+                       i, a->size, a->ptr, a->file, a->line);
+        }
 }
 
 #endif /* RMD_IMPLEMENTATION */
