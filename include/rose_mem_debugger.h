@@ -327,6 +327,9 @@ rmd_void *_rmdi_malloc_internal(rmd_size sz, const char *file_name,
  */
 static struct rmdi_block *_rmdi_is_double_free(rmd_void *ptr_trying_free)
 {
+        rmd_assertf(ptr_trying_free != NULL,
+                    "Trying to check if NULL was freed... dumbass");
+
         for (struct rmdi_block *a = rmdi_blocks;
              (rmd_size)(a - rmdi_blocks) < RMD_MAX_ALLOCS; ++a)
                 if (!a->in_use && a->ptr == ptr_trying_free)
@@ -338,26 +341,45 @@ static struct rmdi_block *_rmdi_is_double_free(rmd_void *ptr_trying_free)
 rmd_void _rmdi_free_internal(rmd_void *ptr, const char *file_name,
                              const int line_num)
 {
+        struct rmdi_block *dfblock;
+
         rmd_assertf(rmdi_is_init, "Trying to call `rmd_free()` before"
                                   "`rose_mem_debugger_init() was called.`");
 
+        /*
+         * Before doing anything, make sure it's a
+         * valid point, and also not a double-free!
+         */
 #ifdef RMD_STRICT_FREE
         rmd_assertf(ptr != NULL, "Trying to free a NULL pointer <%p>!", ptr);
+        dfblock = _rmdi_is_double_free(ptr);
+        /*
+         * So, the reason this assertion is encased in an if statement
+         * is because when it succeeds, the dfblock is NULL, and it's
+         * trying to dereference it for it's parameter list,
+         * and we can't have that, now can we?
+         *
+         * Yes, it's an ugly fix, but I don't give 2 shits over 3 fucks rn...
+         */
+        if (dfblock) {
+                rmd_assertf(0,
+                            "Attempting to double-free pointer <%p> "
+                            "at [%s:%d], which was originally "
+                            "allocated at [%s:%d]", ptr, file_name, line_num,
+                            dfblock->file, dfblock->line);
+        }
 #else /* RMD_STRICT_FREE */
         if (!ptr)
                 return;
-#endif /* RMD_STRICT_FREE */
 
-        /* Before doing anything, make sure it's not a double-free! */
-#ifdef RMD_STRICT_FREE
-                rmd_assertf(!_rmdi_is_double_free(ptr),
+        dfblock = _rmdi_is_double_free(ptr);
+        if (dfblock) {
+                    fprintf(stderr,
                             "Attempting to double-free pointer <%p> "
-                            "at [%s:%d]", ptr, file_name, line_num);
-#else /* RMD_STRICT_FREE */
-        if (_rmdi_is_double_free(ptr)) {
-                fprintf(stderr, "Attempting to double-free pointer <%p> "
-                                "at [%s:%d]", ptr, file_name, line_num);
-                return;
+                            "at [%s:%d], which was originally "
+                            "allocated at [%s:%d]", ptr, file_name, line_num,
+                            dfblock->file, dfblock->line);
+                    return;
         }
 #endif /* RMD_STRICT_FREE */
 
