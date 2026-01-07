@@ -47,7 +47,7 @@ void bing_bong(void)
                 free(allocs[i]);
 
         free(allocs);
-        free(allocs);
+        // free(allocs);
 
         rose_mem_debugger_terminate();
 }
