@@ -77,12 +77,22 @@ typedef enum {
                               __LINE__, fmt, __VA_ARGS__)
 #endif /* rmd_assertf */
 
+#ifndef rmd_malloc
+#define rmd_malloc(x) _rmdi_malloc_internal(x, __FILE__, __LINE__)
+#endif /* rmd_malloc */
+
+#ifndef rmd_free
+#define rmd_free(x) _rmdi_free_internal(x, __FILE__, __LINE__)
+#endif /* rmd_free */
+
 /* Function prototypes */
 extern rmd_void rose_mem_debugger_init(const rmd_flags_e flags);
 extern rmd_void rose_mem_debugger_terminate(void);
 
-extern rmd_void *rmd_malloc(rmd_size sz);
-extern rmd_void rmd_free(rmd_void *ptr);
+extern rmd_void *_rmdi_malloc_internal(rmd_size sz, const char *file_name,
+                                       const int line_num);
+extern rmd_void _rmdi_free_internal(rmd_void *ptr, const char *file_name,
+                                    const int line_num);
 
 extern rmd_void rmd_print_heap_usage(void);
 
@@ -244,14 +254,8 @@ static __inline rmd_void _rmdi_system_free(rmd_void *ptr)
         free(ptr);
 }
 
-/*
- * TODO: Make an internal version of this
- * function that takes in __FILE__ and __LINE__
- * as parameters, store those in the original struct,
- * and that will make it easier to determine EXACTLY
- * when an allocation happened when debugging.
- */
-rmd_void *rmd_malloc(rmd_size sz)
+rmd_void *_rmdi_malloc_internal(rmd_size sz, const char *file_name,
+                                const int line_num)
 {
         struct rmdi_allocation *a;
         
@@ -286,8 +290,9 @@ rmd_void *rmd_malloc(rmd_size sz)
                     "Too many allocations (%lu)!\n", rmdi_num_allocations);
 
         if (rmdi_flags & RMDF_PRINT_HEAP_CALLS) {
-                printf("Allocated %lu bytes at slot %lu.\n",
-                       a->size, (rmd_size)(a - rmdi_allocations));
+                printf("malloc(%lu B) [s%lu] -> [%s:%d].\n",
+                       a->size, (rmd_size)(a - rmdi_allocations),
+                       file_name, line_num);
         }
 
         a->in_use = RMD_TRUE;
@@ -295,7 +300,8 @@ rmd_void *rmd_malloc(rmd_size sz)
         return a->ptr;
 }
 
-rmd_void rmd_free(rmd_void *ptr)
+rmd_void _rmdi_free_internal(rmd_void *ptr, const char *file_name,
+                             const int line_num)
 {
         rmd_assertm(rmdi_is_init, "Trying to call `rmd_free()` before"
                                   "`rose_mem_debugger_init() was called.`");
@@ -330,8 +336,9 @@ rmd_void rmd_free(rmd_void *ptr)
                 rmdi_bytes_allocated -= a->size;
 
                 if (rmdi_flags & RMDF_PRINT_HEAP_CALLS) {
-                        printf("Freed %lu bytes from slot %lu\n",
-                               a->size, (rmd_size)(a - rmdi_allocations));
+                        printf("free(%lu B) [s%lu] -> [%s:%d].\n",
+                               a->size, (rmd_size)(a - rmdi_allocations),
+                               file_name, line_num);
                 }
 
                 a->ptr    = NULL;
