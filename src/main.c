@@ -1,8 +1,8 @@
-#include "bing.h"
+#include <time.h>
 
+#define RMD_IMPLEMENTATION
 #include "rose_mem_debugger.h"
 
-#if 0
 static rmd_void inds_randomize(rmd_u8 *lst, const rmd_u8 cnt)
 {
         /* Generate linear deck */
@@ -24,11 +24,9 @@ static rmd_void inds_randomize(rmd_u8 *lst, const rmd_u8 cnt)
                 *ba = tmp;
         }
 }
-#endif
 
 int main(void)
 {
-#if 0
         rmd_u8   alloc_cnt = 13u;
         rmd_u8 **allocs    = NULL;
         rmd_u8   inds[13u] = { 0u };
@@ -50,8 +48,4 @@ int main(void)
         rose_mem_debugger_terminate();
 
         return 0;
-#else
-        bing_bong();
-        return 0;
-#endif
 }
