@@ -1,5 +1,7 @@
 #include <time.h>
 
+#define RMD_ENABLE_WRAPPING
+#define RMD_STRICT_FREE
 #define RMD_IMPLEMENTATION
 #include "rose_mem_debugger.h"
 
@@ -32,7 +34,7 @@ int main(void)
         rmd_u8   inds[13u] = { 0u };
 
         srand(time(NULL));
-        rose_mem_debugger_init(RMDF_NONE);
+        rose_mem_debugger_init(RMDF_PRINT_HEAP_CALLS);
 
         allocs = malloc(sizeof(*allocs) * alloc_cnt);
 
