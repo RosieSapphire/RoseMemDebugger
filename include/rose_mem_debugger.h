@@ -73,15 +73,10 @@ typedef enum {
         _rmdi_assertf_internal(cond, #cond, __FILE__, __LINE__, NULL)
 #endif /* rmd_assert */
 
-#ifndef rmd_assertm
-#define rmd_assertm(cond, msg) \
-        _rmdi_assertf_internal(cond, #cond, __FILE__, __LINE__, msg)
-#endif /* rmd_assertm */
-
+/* `fmt` or `msg` must be the first variadic parameter here! */
 #ifndef rmd_assertf
-#define rmd_assertf(cond, fmt, ...)                       \
-        _rmdi_assertf_internal(cond, #cond, __FILE__,      \
-                              __LINE__, fmt, __VA_ARGS__)
+#define rmd_assertf(cond, ...) \
+        _rmdi_assertf_internal(cond, #cond, __FILE__, __LINE__, __VA_ARGS__)
 #endif /* rmd_assertf */
 
 #ifndef rmd_malloc
@@ -198,8 +193,8 @@ static rmd_void _rmdi_assertf_internal(const rmd_bool cond,
 
 rmd_void rose_mem_debugger_init(const rmd_flags_e flags)
 {
-        rmd_assertm(!rmdi_is_init,
-                    "Rose Mem Debugger was already initialized!\n");
+        rmd_assertf(!rmdi_is_init,
+                    "Rose Mem Debugger was already initialized!");
 
         rmdi_bytes_allocated = 0u;
         rmdi_num_allocations = 0u;
@@ -211,8 +206,8 @@ rmd_void rose_mem_debugger_init(const rmd_flags_e flags)
 
 rmd_void rose_mem_debugger_terminate(void)
 {
-        rmd_assertm(rmdi_is_init,
-                    "Rose Mem Debugger was never initialized; can't free!\n");
+        rmd_assertf(rmdi_is_init,
+                    "Rose Mem Debugger was never initialized; can't free!");
 
         /*
          * This function *does* free all the stuff that was
@@ -277,22 +272,22 @@ rmd_void *_rmdi_malloc_internal(rmd_size sz, const char *file_name,
 {
         struct rmdi_block *a;
         
-        rmd_assertm(rmdi_is_init, "Trying to call `rmd_malloc()` before"
+        rmd_assertf(rmdi_is_init, "Trying to call `rmd_malloc()` before"
                                   "`rose_mem_debugger_init() was called.`");
 
-        rmd_assertm(sz, "Trying to allocate with zero size!");
+        rmd_assertf(sz, "Trying to allocate with zero size!");
 
         a = _rmdi_get_first_available_slot();
-        rmd_assertm(a != NULL, "Couldn't find allocation slot!");
-        rmd_assertm(!a->ptr, "Trying to allocate to a slot "
+        rmd_assertf(a != NULL, "Couldn't find allocation slot!");
+        rmd_assertf(!a->ptr, "Trying to allocate to a slot "
                              "that already has a pointer");
-        rmd_assertm(!a->req_size, "Trying to allocate to a slot "
+        rmd_assertf(!a->req_size, "Trying to allocate to a slot "
                                   "that already has a size");
-        rmd_assertm(!a->in_use, "Trying to allocate to a slot "
+        rmd_assertf(!a->in_use, "Trying to allocate to a slot "
                                 "that is already marked as in use");
 
         a->ptr = _rmdi_system_malloc(sz);
-        rmd_assertm(a->ptr != NULL, "Allocation pointer failed to malloc()!");
+        rmd_assertf(a->ptr != NULL, "Allocation pointer failed to malloc()!");
 
         rmdi_bytes_allocated += sz;
         a->req_size           = sz;
@@ -333,7 +328,7 @@ static struct rmdi_block *_rmdi_is_double_free(rmd_void *ptr_trying_free)
 rmd_void _rmdi_free_internal(rmd_void *ptr, const char *file_name,
                              const int line_num)
 {
-        rmd_assertm(rmdi_is_init, "Trying to call `rmd_free()` before"
+        rmd_assertf(rmdi_is_init, "Trying to call `rmd_free()` before"
                                   "`rose_mem_debugger_init() was called.`");
 
 #ifdef RMD_STRICT_FREE
@@ -403,7 +398,7 @@ rmd_void rmd_print_heap_usage(void)
                         continue;
 
                 ++allocs_counted;
-                rmd_assertm(a->req_size, "Suppose to have size!");
+                rmd_assertf(a->req_size, "Suppose to have size!");
                 bytes_counted += a->req_size;
         }
 
