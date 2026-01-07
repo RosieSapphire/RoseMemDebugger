@@ -244,9 +244,19 @@ static __inline rmd_void _rmdi_system_free(rmd_void *ptr)
         free(ptr);
 }
 
+/*
+ * TODO: Make an internal version of this
+ * function that takes in __FILE__ and __LINE__
+ * as parameters, store those in the original struct,
+ * and that will make it easier to determine EXACTLY
+ * when an allocation happened when debugging.
+ */
 rmd_void *rmd_malloc(rmd_size sz)
 {
         struct rmdi_allocation *a;
+        
+        rmd_assertm(rmdi_is_init, "Trying to call `rmd_malloc()` before"
+                                  "`rose_mem_debugger_init() was called.`");
 
         rmd_assertm(sz, "Trying to allocate with zero size!");
 
@@ -283,6 +293,9 @@ rmd_void *rmd_malloc(rmd_size sz)
 
 rmd_void rmd_free(rmd_void *ptr)
 {
+        rmd_assertm(rmdi_is_init, "Trying to call `rmd_free()` before"
+                                  "`rose_mem_debugger_init() was called.`");
+
 #ifdef RMD_STRICT_FREE
         rmd_assertf(ptr != NULL, "Trying to free a NULL pointer <%p>!", ptr);
 #else /* RMD_STRICT_FREE */
