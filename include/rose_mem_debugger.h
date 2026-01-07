@@ -224,25 +224,25 @@ rmd_void rose_mem_debugger_terminate(void)
         rmd_print_heap_usage();
 
 #ifdef RMD_FREE_ALL_SLOTS_ON_TERMINATE
-        for (rmd_size i = 0u; i < RMD_MAX_ALLOCS; ++i) {
-                struct rmdi_block *a;
+        for (struct rmdi_block *a = rmdi_blocks;
+             (rmd_size)(a - rmdi_blocks) < RMD_MAX_ALLOCS; ++a) {
+                if (!a->ptr)
+                        continue;
 
-                a = rmdi_blocks + i;
+                rmd_assertf(a->req_size, "Pointer <%p> is allocated, "
+                                         "and should have size, "
+                                         "but doesn't.", a->ptr);
+                rmd_assertf(a->in_use, "Pointer <%p> is allocated "
+                                       "and has size %lu, but is not "
+                                       "marked as `in_use`.\n", a->ptr);
 
-                if (a->ptr) {
-                        rmd_assertf(a->req_size, "Pointer <%p> is allocated, "
-                                                 "and should have size, "
-                                                 "but doesn't.", a->ptr);
-                        rmd_assertf(a->in_use, "Pointer <%p> is allocated "
-                                               "and has size %lu, but is not "
-                                               "marked as `in_use`.\n", a->ptr);
-                        rmd_free(a->ptr);
-                        a->ptr      = NULL;
-                        a->req_size = 0u;
-                        a->in_use   = RMD_FALSE;
-                        a->file     = NULL;
-                        a->line     = -1;
-                }
+                rmd_free(a->ptr);
+
+                a->ptr      = NULL;
+                a->req_size = 0u;
+                a->in_use   = RMD_FALSE;
+                a->file     = NULL;
+                a->line     = -1;
         }
 #endif /* RMD_FREE_ALL_SLOTS_ON_TERMINATE */
 
@@ -254,15 +254,10 @@ rmd_void rose_mem_debugger_terminate(void)
 
 static struct rmdi_block *_rmdi_get_first_available_slot(void)
 {
-        for (rmd_size i = 0u; i < RMD_MAX_ALLOCS; ++i) {
-                struct rmdi_block *a;
-
-                a = rmdi_blocks + i;
-                if (a->in_use)
-                        continue;
-
-                return a;
-        }
+        for (struct rmdi_block *a = rmdi_blocks;
+             (rmd_size)(a - rmdi_blocks) < RMD_MAX_ALLOCS; ++a)
+                if (!a->in_use)
+                        return a;
 
         return NULL;
 }
@@ -321,17 +316,16 @@ rmd_void *_rmdi_malloc_internal(rmd_size sz, const char *file_name,
 
 /*
  * This function returns `NULL` upon success.
+ * I've noticed this function looks almost identical
+ * to `_rmdi_get_first_available_slot()`, so I wonder
+ * if there's a way to integrate them. Probably not a big concern rn tho. lol
  */
 static struct rmdi_block *_rmdi_is_double_free(rmd_void *ptr_trying_free)
 {
-        /* TODO: CHange for loop style. :3 */
-        for (rmd_size i = 0u; i < RMD_MAX_ALLOCS; ++i) {
-                struct rmdi_block *a;
-
-                a = rmdi_blocks + i;
+        for (struct rmdi_block *a = rmdi_blocks;
+             (rmd_size)(a - rmdi_blocks) < RMD_MAX_ALLOCS; ++a)
                 if (!a->in_use && a->ptr == ptr_trying_free)
                         return a;
-        }
 
         return NULL;
 }
@@ -372,10 +366,8 @@ rmd_void _rmdi_free_internal(rmd_void *ptr, const char *file_name,
          * This could be a subject of premature optimization, so
          * don't worry about it too much for now. :D
          */
-        for (rmd_size i = 0u; i < RMD_MAX_ALLOCS; ++i) {
-                struct rmdi_block *a;
-
-                a = rmdi_blocks + i;
+        for (struct rmdi_block *a = rmdi_blocks;
+             (rmd_size)(a - rmdi_blocks) < RMD_MAX_ALLOCS; ++a) {
                 if (!a->in_use || ptr != a->ptr)
                         continue;
 
@@ -405,15 +397,14 @@ rmd_void rmd_print_heap_usage(void)
         rmd_size bytes_counted  = 0u;
         rmd_size allocs_counted = 0u;
 
-        for (rmd_size i = 0u; i < RMD_MAX_ALLOCS; ++i) {
-                struct rmdi_block *a;
+        for (struct rmdi_block *a = rmdi_blocks;
+             (rmd_size)(a - rmdi_blocks) < RMD_MAX_ALLOCS; ++a) {
+                if (!a->in_use)
+                        continue;
 
-                a = rmdi_blocks + i;
-                if (a->in_use) {
-                        ++allocs_counted;
-                        rmd_assertm(a->req_size, "Suppose to have size!");
-                        bytes_counted += a->req_size;
-                }
+                ++allocs_counted;
+                rmd_assertm(a->req_size, "Suppose to have size!");
+                bytes_counted += a->req_size;
         }
 
         rmd_assertf(bytes_counted == rmdi_bytes_allocated,
@@ -435,16 +426,12 @@ rmd_void rmd_print_heap_usage(void)
         if (!bytes_counted && !allocs_counted)
                 return;
 
-        for (rmd_size i = 0u; i < RMD_MAX_ALLOCS; ++i) {
-                struct rmdi_block *a;
-
-                a = rmdi_blocks + i;
-                if (!a->in_use)
-                        continue;
-
-                printf("LEAK: [s%lu] -> %lu B -> <%p> -> [%s:%d]\n",
-                       i, a->req_size, a->ptr, a->file, a->line);
-        }
+        for (struct rmdi_block *a = rmdi_blocks;
+             (rmd_size)(a - rmdi_blocks) < RMD_MAX_ALLOCS; ++a)
+                if (a->in_use)
+                        printf("LEAK: [s%lu] -> %lu B -> <%p> -> [%s:%d]\n",
+                               (rmd_size)(a - rmdi_blocks), a->req_size,
+                               a->ptr, a->file, a->line);
 }
 
 #endif /* RMD_IMPLEMENTATION */
