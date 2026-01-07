@@ -34,11 +34,6 @@
 #include <stddef.h>
 #endif /* RMD_NO_INCLUDE_STDDEF */
 
-#ifndef RMD_UNUSED
-/* FIXME: This will only work on Linux! */
-#define RMD_UNUSED __attribute__((unused))
-#endif /* RMD_UNUSED */
-
 #ifndef RMD_MAX_ALLOCS
 #define RMD_MAX_ALLOCS 4096
 #endif /* RMD_MAX_ALLOCS */
@@ -153,19 +148,19 @@ static rmd_size          rmdi_num_allocations         = 0u;
 static struct rmdi_block rmdi_blocks[RMD_MAX_ALLOCS]  = { 0u };
 
 /* Implementation function definitions */
-#ifdef RMD_DISABLE_ASSERTS
-static rmd_void _rmdi_assertf_internal(RMD_UNUSED const rmd_bool cond,
-                                       RMD_UNUSED const char *cond_str,
-                                       RMD_UNUSED const char *file,
-                                       RMD_UNUSED const int line,
-                                       RMD_UNUSED const char *fmt, ...)
-{ return; }
-#else /* RMD_DISABLE_ASSERTS */
 static rmd_void _rmdi_assertf_internal(const rmd_bool cond,
                                        const char *cond_str,
                                        const char *file, const int line,
                                        const char *fmt, ...)
 {
+#ifdef RMD_DISABLE_ASSERTS
+        (void)cond;
+        (void)cond_str;
+        (void)file;
+        (void)line;
+        (void)fmt;
+        return;
+#else /* RMD_DISABLE_ASSERTS */
         if (cond)
                 return;
 
@@ -198,8 +193,8 @@ static rmd_void _rmdi_assertf_internal(const rmd_bool cond,
 
         fputc('\n', stderr);
         exit(-1);
-}
 #endif /* RMD_DISABLE_ASSERTS */
+}
 
 rmd_void rose_mem_debugger_init(const rmd_flags_e flags)
 {
