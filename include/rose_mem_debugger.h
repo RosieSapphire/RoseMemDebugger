@@ -18,7 +18,7 @@
  * allow you to enable or disable certain things about the API.
  *
  * Some examples are:
- * - RMD_DISABLE_WRAPPING
+ * - RMD_ENABLE_WRAPPING
  * - RMD_NO_INCLUDE_STDDEF
  * - RMD_DISABLE_ASSERTS
  * - RMD_MAX_ALLOCS
@@ -433,9 +433,9 @@ rmd_void rmd_print_heap_usage(void)
  * Handle malloc and free wrapping down here
  * outside implementation, but still inside header.
  */
-#ifndef RMD_DISABLE_WRAPPING
+#ifdef RMD_ENABLE_WRAPPING
 #define malloc(sz) rmd_malloc(sz)
 #define free(ptr) rmd_free(ptr)
-#endif /* RMD_DISABLE_WRAPPING */
+#endif /* RMD_ENABLE_WRAPPING */
 
 #endif /* RMDI_INCLUDE_H */

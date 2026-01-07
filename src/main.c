@@ -2,6 +2,7 @@
 #include <time.h>
 
 #define RMD_STRICT_FREE
+#define RMD_ENABLE_WRAPPING
 #define RMD_IMPLEMENTATION
 #include "rose_mem_debugger.h"
 
@@ -46,7 +47,7 @@ int main(void)
         for (rmd_u8 i = 0u; i < alloc_cnt; ++i)
                 free(allocs[i]);
 
-        // free(allocs);
+        free(allocs);
 
         rose_mem_debugger_terminate();
 
