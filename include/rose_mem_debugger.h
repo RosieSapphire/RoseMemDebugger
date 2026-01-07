@@ -247,6 +247,8 @@ rmd_void rose_mem_debugger_terminate(void)
                         a->ptr    = NULL;
                         a->size   = 0u;
                         a->in_use = RMD_FALSE;
+                        a->file   = NULL;
+                        a->line   = -1;
                 }
         }
 #endif /* RMD_FREE_ALL_SLOTS_ON_TERMINATE */
