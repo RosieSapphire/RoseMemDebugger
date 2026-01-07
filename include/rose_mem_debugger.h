@@ -326,6 +326,25 @@ rmd_void *_rmdi_malloc_internal(rmd_size sz, const char *file_name,
         return a->ptr;
 }
 
+/*
+ * TODO:
+ * Rename `rmdi_allocation` to `rmdi_block`. Too fucken long!
+ */
+
+/* This function returns `NULL` upon success. */
+static struct rmdi_allocation *_rmdi_is_double_free(rmd_void *ptr_trying_free)
+{
+        for (rmd_size i = 0u; i < RMD_MAX_ALLOCS; ++i) {
+                struct rmdi_allocation *a;
+
+                a = rmdi_allocations + i;
+                if (!a->in_use && a->ptr == ptr_trying_free)
+                        return a;
+        }
+
+        return NULL;
+}
+
 rmd_void _rmdi_free_internal(rmd_void *ptr, const char *file_name,
                              const int line_num)
 {
@@ -337,6 +356,19 @@ rmd_void _rmdi_free_internal(rmd_void *ptr, const char *file_name,
 #else /* RMD_STRICT_FREE */
         if (!ptr)
                 return;
+#endif /* RMD_STRICT_FREE */
+
+        /* Before doing anything, make sure it's not a double-free! */
+#ifdef RMD_STRICT_FREE
+                rmd_assertf(!_rmdi_is_double_free(ptr),
+                            "Attempting to double-free pointer <%p> "
+                            "at [%s:%d]", ptr, file_name, line_num);
+#else /* RMD_STRICT_FREE */
+        if (_rmdi_is_double_free(ptr)) {
+                fprintf(stderr, "Attempting to double-free pointer <%p> "
+                                "at [%s:%d]", ptr, file_name, line_num);
+                return;
+        }
 #endif /* RMD_STRICT_FREE */
 
         /*
@@ -367,14 +399,14 @@ rmd_void _rmdi_free_internal(rmd_void *ptr, const char *file_name,
                                file_name, line_num);
                 }
 
-                a->ptr      = NULL;
-                a->in_use   = RMD_FALSE;
-                a->req_size = 0u;
+                a->in_use = RMD_FALSE;
 
                 return;
         }
 
+#ifdef RMD_STRICT_FREE
         rmd_assertf(0, "Failed to find pointer <%p> to free!", ptr);
+#endif /* RMD_STRICT_FREE */
 }
 
 rmd_void rmd_print_heap_usage(void)
@@ -390,9 +422,6 @@ rmd_void rmd_print_heap_usage(void)
                         ++allocs_counted;
                         rmd_assertm(a->req_size, "Suppose to have size!");
                         bytes_counted += a->req_size;
-                } else {
-                        rmd_assertm(!a->req_size, "Not supposed to have size!");
-                        rmd_assertm(!a->ptr,  "Not supposed to have pointer!");
                 }
         }
 
