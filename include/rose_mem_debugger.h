@@ -134,7 +134,7 @@ extern rmd_void rmd_print_heap_usage(void);
 /* Implementation types and structs */
 struct rmdi_allocation {
         rmd_void   *ptr;
-        rmd_size    size;
+        rmd_size    req_size;
         rmd_bool    in_use;
         const char *file; /* NOTE: This must be a static string pointer! */
         int         line;
@@ -237,18 +237,18 @@ rmd_void rose_mem_debugger_terminate(void)
                 a = rmdi_allocations + i;
 
                 if (a->ptr) {
-                        rmd_assertf(a->size, "Pointer <%p> is allocated, "
-                                             "and should have size, "
-                                             "but doesn't.", a->ptr);
+                        rmd_assertf(a->req_size, "Pointer <%p> is allocated, "
+                                                 "and should have size, "
+                                                 "but doesn't.", a->ptr);
                         rmd_assertf(a->in_use, "Pointer <%p> is allocated "
                                                "and has size %lu, but is not "
                                                "marked as `in_use`.\n", a->ptr);
                         rmd_free(a->ptr);
-                        a->ptr    = NULL;
-                        a->size   = 0u;
-                        a->in_use = RMD_FALSE;
-                        a->file   = NULL;
-                        a->line   = -1;
+                        a->ptr      = NULL;
+                        a->req_size = 0u;
+                        a->in_use   = RMD_FALSE;
+                        a->file     = NULL;
+                        a->line     = -1;
                 }
         }
 #endif /* RMD_FREE_ALL_SLOTS_ON_TERMINATE */
@@ -298,8 +298,8 @@ rmd_void *_rmdi_malloc_internal(rmd_size sz, const char *file_name,
         rmd_assertm(a != NULL, "Couldn't find allocation slot!");
         rmd_assertm(!a->ptr, "Trying to allocate to a slot "
                              "that already has a pointer");
-        rmd_assertm(!a->size, "Trying to allocate to a slot "
-                              "that already has a size");
+        rmd_assertm(!a->req_size, "Trying to allocate to a slot "
+                                  "that already has a size");
         rmd_assertm(!a->in_use, "Trying to allocate to a slot "
                                 "that is already marked as in use");
 
@@ -307,7 +307,7 @@ rmd_void *_rmdi_malloc_internal(rmd_size sz, const char *file_name,
         rmd_assertm(a->ptr != NULL, "Allocation pointer failed to malloc()!");
 
         rmdi_bytes_allocated += sz;
-        a->size = sz;
+        a->req_size           = sz;
 
         ++rmdi_num_allocations;
         rmd_assertf(rmdi_num_allocations < RMD_MAX_ALLOCS,
@@ -315,7 +315,7 @@ rmd_void *_rmdi_malloc_internal(rmd_size sz, const char *file_name,
 
         if (rmdi_flags & RMDF_PRINT_HEAP_CALLS) {
                 printf("malloc(%lu B) [s%lu] -> [%s:%d].\n",
-                       a->size, (rmd_size)(a - rmdi_allocations),
+                       a->req_size, (rmd_size)(a - rmdi_allocations),
                        file_name, line_num);
         }
 
@@ -359,17 +359,17 @@ rmd_void _rmdi_free_internal(rmd_void *ptr, const char *file_name,
                 _rmdi_system_free(a->ptr);
 
                 --rmdi_num_allocations;
-                rmdi_bytes_allocated -= a->size;
+                rmdi_bytes_allocated -= a->req_size;
 
                 if (rmdi_flags & RMDF_PRINT_HEAP_CALLS) {
                         printf("free(%lu B) [s%lu] -> [%s:%d].\n",
-                               a->size, (rmd_size)(a - rmdi_allocations),
+                               a->req_size, (rmd_size)(a - rmdi_allocations),
                                file_name, line_num);
                 }
 
-                a->ptr    = NULL;
-                a->in_use = RMD_FALSE;
-                a->size   = 0u;
+                a->ptr      = NULL;
+                a->in_use   = RMD_FALSE;
+                a->req_size = 0u;
 
                 return;
         }
@@ -388,10 +388,10 @@ rmd_void rmd_print_heap_usage(void)
                 a = rmdi_allocations + i;
                 if (a->in_use) {
                         ++allocs_counted;
-                        rmd_assertm(a->size, "Suppose to have size!");
-                        bytes_counted += a->size;
+                        rmd_assertm(a->req_size, "Suppose to have size!");
+                        bytes_counted += a->req_size;
                 } else {
-                        rmd_assertm(!a->size, "Not supposed to have size!");
+                        rmd_assertm(!a->req_size, "Not supposed to have size!");
                         rmd_assertm(!a->ptr,  "Not supposed to have pointer!");
                 }
         }
@@ -423,7 +423,7 @@ rmd_void rmd_print_heap_usage(void)
                         continue;
 
                 printf("LEAK: [s%lu] -> %lu B -> <%p> -> [%s:%d]\n",
-                       i, a->size, a->ptr, a->file, a->line);
+                       i, a->req_size, a->ptr, a->file, a->line);
         }
 }
 
