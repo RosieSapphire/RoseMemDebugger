@@ -6,28 +6,20 @@
  * allow you to enable or disable certain things about the API.
  *
  * Some examples are:
- * - RMD_WRAP_MALLOC_AND_FREE
+ * - RMD_DISABLE_WRAPPING
  * - RMD_NO_INCLUDE_STDDEF
- * - RMD_ENABLE_ASSERTS
+ * - RMD_DISABLE_ASSERTS
  * - RMD_MAX_ALLOCS
+ * - RMD_STRICT_FREE
  *
  * Although, I haven't fully planned this out yet, so feel
  * free to look through the code for right now. lmao
  */
 
 /* Defines */
-#ifndef RMD_WRAP_MALLOC_AND_FREE
-#define RMD_WRAP_MALLOC_AND_FREE 1
-#endif /* RMD_WRAP_MALLOC_AND_FREE */
-
 #ifndef RMD_NO_INCLUDE_STDDEF
 #include <stddef.h>
 #endif /* RMD_NO_INCLUDE_STDDEF */
-
-
-#ifndef RMD_ENABLE_ASSERTS
-#define RMD_ENABLE_ASSERTS 1
-#endif /* RMD_ENABLE_ASSERTS */
 
 #ifndef RMD_UNUSED
 /* FIXME: This will only work on Linux! */
@@ -132,14 +124,19 @@ static rmd_size               rmdi_num_allocations              = 0u;
 static struct rmdi_allocation rmdi_allocations[RMDI_MAX_ALLOCS] = { 0u };
 
 /* Implementation function definitions */
+#ifdef RMD_DISABLE_ASSERTS
+static rmd_void _rmdi_assertf_internal(RMD_UNUSED const rmd_bool cond,
+                                       RMD_UNUSED const char *cond_str,
+                                       RMD_UNUSED const char *file,
+                                       RMD_UNUSED const int line,
+                                       RMD_UNUSED const char *fmt, ...)
+{ return; }
+#else /* RMD_DISABLE_ASSERTS */
 static rmd_void _rmdi_assertf_internal(const rmd_bool cond,
                                        const char *cond_str,
                                        const char *file, const int line,
                                        const char *fmt, ...)
 {
-        if (!(RMD_ENABLE_ASSERTS))
-                return;
-
         if (cond)
                 return;
 
@@ -173,6 +170,7 @@ static rmd_void _rmdi_assertf_internal(const rmd_bool cond,
         fputc('\n', stderr);
         exit(-1);
 }
+#endif /* RMD_DISABLE_ASSERTS */
 
 rmd_void rose_mem_debugger_init(const rmd_flags_e flags)
 {
@@ -285,7 +283,12 @@ rmd_void *rmd_malloc(rmd_size sz)
 
 rmd_void rmd_free(rmd_void *ptr)
 {
+#ifdef RMD_STRICT_FREE
         rmd_assertf(ptr != NULL, "Trying to free a NULL pointer <%p>!", ptr);
+#else /* RMD_STRICT_FREE */
+        if (!ptr)
+                return;
+#endif /* RMD_STRICT_FREE */
 
         /*
          * FIXME:
@@ -361,13 +364,9 @@ rmd_void rmd_print_heap_usage(void)
  * Handle malloc and free wrapping down here
  * outside implementation, but still inside header.
  */
-#if RMD_WRAP_MALLOC_AND_FREE
-#ifndef malloc
+#ifndef RMD_DISABLE_WRAPPING
 #define malloc(sz) rmd_malloc(sz)
-#endif /* malloc */
-#ifndef free
 #define free(ptr) rmd_free(ptr)
-#endif /* free */
-#endif /* RMD_WRAP_MALLOC_AND_FREE */
+#endif /* RMD_DISABLE_WRAPPING */
 
 #endif /* RMDI_INCLUDE_H */

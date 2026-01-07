@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <time.h>
 
+#define RMD_STRICT_FREE
 #define RMD_IMPLEMENTATION
 #include "rose_mem_debugger.h"
 
