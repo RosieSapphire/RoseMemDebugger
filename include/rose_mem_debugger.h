@@ -97,7 +97,7 @@ extern rmd_void rmd_print_heap_usage(void);
  * this on when committing, so I am just making a note
  * of this stupid bullshit right now. lmfao
  */
-#if 0
+#if 1
 #define RMD_IMPLEMENTATION
 #endif
 
@@ -260,15 +260,19 @@ rmd_void *rmd_malloc(rmd_size sz)
 
         rmd_assertm(sz, "Trying to allocate with zero size!");
 
-        rmdi_bytes_allocated += sz;
-
         a = _rmdi_get_first_available_slot();
         rmd_assertm(a != NULL, "Couldn't find allocation slot!");
+        rmd_assertm(!a->ptr, "Trying to allocate to a slot "
+                             "that already has a pointer");
+        rmd_assertm(!a->size, "Trying to allocate to a slot "
+                              "that already has a size");
+        rmd_assertm(!a->in_use, "Trying to allocate to a slot "
+                                "that is already marked as in use");
 
         a->ptr = _rmdi_system_malloc(sz);
-
         rmd_assertm(a->ptr != NULL, "Allocation pointer failed to malloc()!");
 
+        rmdi_bytes_allocated += sz;
         a->size = sz;
 
         /*
@@ -281,12 +285,12 @@ rmd_void *rmd_malloc(rmd_size sz)
         rmd_assertf(rmdi_num_allocations < RMDI_MAX_ALLOCS,
                     "Too many allocations (%lu)!\n", rmdi_num_allocations);
 
-        a->in_use = RMD_TRUE;
-
         if (rmdi_flags & RMDF_PRINT_HEAP_CALLS) {
                 printf("Allocated %lu bytes at slot %lu.\n",
                        a->size, (rmd_size)(a - rmdi_allocations));
         }
+
+        a->in_use = RMD_TRUE;
 
         return a->ptr;
 }
