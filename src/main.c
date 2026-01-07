@@ -35,7 +35,6 @@ int main(void)
         rmd_u8   inds[13u] = { 0u };
 
         srand(time(NULL));
-        // rose_mem_debugger_init(RMDF_PRINT_HEAP_CALLS);
         rose_mem_debugger_init(RMDF_NONE);
 
         allocs = malloc(sizeof(*allocs) * alloc_cnt);

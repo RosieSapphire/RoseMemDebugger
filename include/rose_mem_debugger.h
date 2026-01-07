@@ -132,7 +132,7 @@ extern rmd_void rmd_print_heap_usage(void);
 #include <string.h>
 
 /* Implementation types and structs */
-struct rmdi_allocation {
+struct rmdi_block {
         rmd_void   *ptr;
         rmd_size    req_size;
         rmd_bool    in_use;
@@ -141,11 +141,11 @@ struct rmdi_allocation {
 };
 
 /* Implementation static variables */
-static rmd_bool               rmdi_is_init                      = RMD_FALSE;
-static rmd_flags_e            rmdi_flags                        = 0u;
-static rmd_size               rmdi_bytes_allocated              = 0u;
-static rmd_size               rmdi_num_allocations              = 0u;
-static struct rmdi_allocation rmdi_allocations[RMD_MAX_ALLOCS]  = { 0u };
+static rmd_bool          rmdi_is_init                 = RMD_FALSE;
+static rmd_flags_e       rmdi_flags                   = 0u;
+static rmd_size          rmdi_bytes_allocated         = 0u;
+static rmd_size          rmdi_num_allocations         = 0u;
+static struct rmdi_block rmdi_blocks[RMD_MAX_ALLOCS]  = { 0u };
 
 /* Implementation function definitions */
 #ifdef RMD_DISABLE_ASSERTS
@@ -203,8 +203,7 @@ rmd_void rose_mem_debugger_init(const rmd_flags_e flags)
 
         rmdi_bytes_allocated = 0u;
         rmdi_num_allocations = 0u;
-        memset(rmdi_allocations, 0,
-               RMD_MAX_ALLOCS * sizeof(*rmdi_allocations));
+        memset(rmdi_blocks, 0, RMD_MAX_ALLOCS * sizeof(*rmdi_blocks));
 
         rmdi_flags   = flags;
         rmdi_is_init = RMD_TRUE;
@@ -224,17 +223,11 @@ rmd_void rose_mem_debugger_terminate(void)
          */
         rmd_print_heap_usage();
 
-        /*
-         * FIXME:
-         * I'm going to be honest, I'm not 100% sure if I want
-         * this program to flush out all the memory. It does for
-         * now, but I'm honestly not sure where to go from here. :/
-         */
 #ifdef RMD_FREE_ALL_SLOTS_ON_TERMINATE
         for (rmd_size i = 0u; i < RMD_MAX_ALLOCS; ++i) {
-                struct rmdi_allocation *a;
+                struct rmdi_block *a;
 
-                a = rmdi_allocations + i;
+                a = rmdi_blocks + i;
 
                 if (a->ptr) {
                         rmd_assertf(a->req_size, "Pointer <%p> is allocated, "
@@ -259,12 +252,12 @@ rmd_void rose_mem_debugger_terminate(void)
         rmdi_is_init         = RMD_FALSE;
 }
 
-static struct rmdi_allocation *_rmdi_get_first_available_slot(void)
+static struct rmdi_block *_rmdi_get_first_available_slot(void)
 {
         for (rmd_size i = 0u; i < RMD_MAX_ALLOCS; ++i) {
-                struct rmdi_allocation *a;
+                struct rmdi_block *a;
 
-                a = rmdi_allocations + i;
+                a = rmdi_blocks + i;
                 if (a->in_use)
                         continue;
 
@@ -287,7 +280,7 @@ static __inline rmd_void _rmdi_system_free(rmd_void *ptr)
 rmd_void *_rmdi_malloc_internal(rmd_size sz, const char *file_name,
                                 const int line_num)
 {
-        struct rmdi_allocation *a;
+        struct rmdi_block *a;
         
         rmd_assertm(rmdi_is_init, "Trying to call `rmd_malloc()` before"
                                   "`rose_mem_debugger_init() was called.`");
@@ -315,7 +308,7 @@ rmd_void *_rmdi_malloc_internal(rmd_size sz, const char *file_name,
 
         if (rmdi_flags & RMDF_PRINT_HEAP_CALLS) {
                 printf("malloc(%lu B) [s%lu] -> [%s:%d].\n",
-                       a->req_size, (rmd_size)(a - rmdi_allocations),
+                       a->req_size, (rmd_size)(a - rmdi_blocks),
                        file_name, line_num);
         }
 
@@ -327,17 +320,15 @@ rmd_void *_rmdi_malloc_internal(rmd_size sz, const char *file_name,
 }
 
 /*
- * TODO:
- * Rename `rmdi_allocation` to `rmdi_block`. Too fucken long!
+ * This function returns `NULL` upon success.
  */
-
-/* This function returns `NULL` upon success. */
-static struct rmdi_allocation *_rmdi_is_double_free(rmd_void *ptr_trying_free)
+static struct rmdi_block *_rmdi_is_double_free(rmd_void *ptr_trying_free)
 {
+        /* TODO: CHange for loop style. :3 */
         for (rmd_size i = 0u; i < RMD_MAX_ALLOCS; ++i) {
-                struct rmdi_allocation *a;
+                struct rmdi_block *a;
 
-                a = rmdi_allocations + i;
+                a = rmdi_blocks + i;
                 if (!a->in_use && a->ptr == ptr_trying_free)
                         return a;
         }
@@ -382,9 +373,9 @@ rmd_void _rmdi_free_internal(rmd_void *ptr, const char *file_name,
          * don't worry about it too much for now. :D
          */
         for (rmd_size i = 0u; i < RMD_MAX_ALLOCS; ++i) {
-                struct rmdi_allocation *a;
+                struct rmdi_block *a;
 
-                a = rmdi_allocations + i;
+                a = rmdi_blocks + i;
                 if (!a->in_use || ptr != a->ptr)
                         continue;
 
@@ -395,7 +386,7 @@ rmd_void _rmdi_free_internal(rmd_void *ptr, const char *file_name,
 
                 if (rmdi_flags & RMDF_PRINT_HEAP_CALLS) {
                         printf("free(%lu B) [s%lu] -> [%s:%d].\n",
-                               a->req_size, (rmd_size)(a - rmdi_allocations),
+                               a->req_size, (rmd_size)(a - rmdi_blocks),
                                file_name, line_num);
                 }
 
@@ -415,9 +406,9 @@ rmd_void rmd_print_heap_usage(void)
         rmd_size allocs_counted = 0u;
 
         for (rmd_size i = 0u; i < RMD_MAX_ALLOCS; ++i) {
-                struct rmdi_allocation *a;
+                struct rmdi_block *a;
 
-                a = rmdi_allocations + i;
+                a = rmdi_blocks + i;
                 if (a->in_use) {
                         ++allocs_counted;
                         rmd_assertm(a->req_size, "Suppose to have size!");
@@ -445,9 +436,9 @@ rmd_void rmd_print_heap_usage(void)
                 return;
 
         for (rmd_size i = 0u; i < RMD_MAX_ALLOCS; ++i) {
-                struct rmdi_allocation *a;
+                struct rmdi_block *a;
 
-                a = rmdi_allocations + i;
+                a = rmdi_blocks + i;
                 if (!a->in_use)
                         continue;
 
