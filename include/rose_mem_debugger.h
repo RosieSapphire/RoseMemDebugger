@@ -415,7 +415,8 @@ rmd_void _rmdi_free_internal(rmd_void *ptr, const char *file_name,
         }
 
 #ifdef RMD_STRICT_FREE
-        rmd_assertf(0, "Failed to find pointer <%p> to free!", ptr);
+        rmd_assertf(0, "Failed to find pointer <%p> to free at [%s:%d]",
+                    ptr, file_name, line_num);
 #endif /* RMD_STRICT_FREE */
 }
 
