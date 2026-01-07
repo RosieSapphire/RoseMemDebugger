@@ -136,7 +136,7 @@ struct rmdi_allocation {
         rmd_void   *ptr;
         rmd_size    size;
         rmd_bool    in_use;
-        const char *file;
+        const char *file; /* NOTE: This must be a static string pointer! */
         int         line;
 };
 
