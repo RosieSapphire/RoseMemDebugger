@@ -126,11 +126,11 @@ extern rmd_void rmd_print_heap_usage(void);
 #endif
 
 #ifdef RMD_IMPLEMENTATION
-#ifndef RMD_IMPLEMENTATION_GAURD
-#define RMD_IMPLEMENTATION_GAURD
-#else /* RMD_IMPLEMENTATION_GAURD */
+#ifndef RMD_IMPLEMENTATION_GUARD
+#define RMD_IMPLEMENTATION_GUARD
+#else /* RMD_IMPLEMENTATION_GUARD */
 #error "RMD_IMPLEMENTATION is defined more than once!"
-#endif /* RMD_IMPLEMENTATION_GAURD */
+#endif /* RMD_IMPLEMENTATION_GUARD */
 
 /* Implementation types and structs */
 struct rmdi_block {
