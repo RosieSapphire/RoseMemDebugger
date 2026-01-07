@@ -124,6 +124,11 @@ extern rmd_void rmd_print_heap_usage(void);
 #endif
 
 #ifdef RMD_IMPLEMENTATION
+#ifndef RMD_IMPLEMENTATION_GAURD
+#define RMD_IMPLEMENTATION_GAURD
+#else /* RMD_IMPLEMENTATION_GAURD */
+#error "RMD_IMPLEMENTATION is defined more than once!"
+#endif /* RMD_IMPLEMENTATION_GAURD */
 
 /* Implementation includes */
 #include <stdio.h>
@@ -433,7 +438,6 @@ rmd_void rmd_print_heap_usage(void)
                                (rmd_size)(a - rmdi_blocks), a->req_size,
                                a->ptr, a->file, a->line);
 }
-
 #endif /* RMD_IMPLEMENTATION */
 
 /*
