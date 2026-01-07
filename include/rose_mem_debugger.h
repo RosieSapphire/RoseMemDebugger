@@ -1,10 +1,29 @@
 #ifndef RMDI_INCLUDE_H
 #define RMDI_INCLUDE_H
 
+/*
+ * There are some configuration macros you can use that will
+ * allow you to enable or disable certain things about the API.
+ *
+ * Some examples are:
+ * - RMD_WRAP_MALLOC_AND_FREE
+ * - RMD_NO_INCLUDE_STDDEF
+ * - RMD_ENABLE_ASSERTS
+ * - RMD_MAX_ALLOCS
+ *
+ * Although, I haven't fully planned this out yet, so feel
+ * free to look through the code for right now. lmao
+ */
+
 /* Defines */
 #ifndef RMD_WRAP_MALLOC_AND_FREE
 #define RMD_WRAP_MALLOC_AND_FREE 1
 #endif /* RMD_WRAP_MALLOC_AND_FREE */
+
+#ifndef RMD_NO_INCLUDE_STDDEF
+#include <stddef.h>
+#endif /* RMD_NO_INCLUDE_STDDEF */
+
 
 #ifndef RMD_ENABLE_ASSERTS
 #define RMD_ENABLE_ASSERTS 1
@@ -15,10 +34,6 @@
 #define RMD_UNUSED __attribute__((unused))
 #endif /* RMD_UNUSED */
 
-#ifndef NULL
-#define NULL ((void *)0)
-#endif /* NULL */
-
 #ifndef RMDI_MAX_ALLOCS
 #define RMDI_MAX_ALLOCS 4096
 #endif /* RMDI_MAX_ALLOCS */
@@ -27,7 +42,7 @@
 typedef unsigned char  rmd_u8;
 typedef unsigned short rmd_u16;
 typedef unsigned int   rmd_u32;
-typedef unsigned long  rmd_size;
+typedef size_t         rmd_size;
 
 /* Signed types */
 typedef signed char  rmd_s8;
@@ -39,44 +54,38 @@ typedef float  rmd_f32;
 typedef double rmd_f64;
 
 /* Other types */
-typedef void   rmd_void;
-typedef rmd_u8 rmd_bool;
-enum { RMD_FALSE, RMD_TRUE };
+typedef void rmd_void;
+typedef enum {
+        RMD_FALSE = 0u,
+        RMD_TRUE = 1u
+} rmd_bool;
 
 /* Initialization flags */
-enum {
+typedef enum {
         RMDF_PRINT_USAGE_AT_EXIT = (1u << 0u),
         RMDF_PRINT_HEAP_CALLS    = (1u << 1u),
         RMD_FLAG_MASK            = (RMDF_PRINT_USAGE_AT_EXIT |
                                     RMDF_PRINT_HEAP_CALLS)
-};
-
-typedef rmd_u8 rmd_flags_e;
+} rmd_flags_e;
 
 /* Function macros */
 #ifndef rmd_assert
 #define rmd_assert(cond) \
-        _rmd_assertf_internal(cond, #cond, __FILE__, __LINE__, NULL)
+        _rmdi_assertf_internal(cond, #cond, __FILE__, __LINE__, NULL)
 #endif /* rmd_assert */
 
 #ifndef rmd_assertm
 #define rmd_assertm(cond, msg) \
-        _rmd_assertf_internal(cond, #cond, __FILE__, __LINE__, msg)
+        _rmdi_assertf_internal(cond, #cond, __FILE__, __LINE__, msg)
 #endif /* rmd_assertm */
 
 #ifndef rmd_assertf
 #define rmd_assertf(cond, fmt, ...)                       \
-        _rmd_assertf_internal(cond, #cond, __FILE__,      \
+        _rmdi_assertf_internal(cond, #cond, __FILE__,      \
                               __LINE__, fmt, __VA_ARGS__)
 #endif /* rmd_assertf */
 
 /* Function prototypes */
-extern rmd_void _rmdi_assertf_internal(const rmd_bool cond,
-                                       const char *cond_str,
-                                       const char *file, const int line,
-                                       const char *fmt, ...);
-extern struct rmdi_allocation *_rmdi_get_first_available_slot(void);
-
 extern rmd_void rose_mem_debugger_init(const rmd_flags_e flags);
 extern rmd_void rose_mem_debugger_terminate(void);
 
@@ -84,6 +93,11 @@ extern rmd_void *rmd_malloc(rmd_size sz);
 extern rmd_void rmd_free(rmd_void *ptr);
 
 extern rmd_void rmd_print_heap_usage(void);
+
+/* FIXME: TMP */
+#if 1
+#define RMD_IMPLEMENTATION
+#endif
 
 #ifdef RMD_IMPLEMENTATION
 
@@ -108,10 +122,10 @@ static rmd_size               rmdi_num_allocations              = 0u;
 static struct rmdi_allocation rmdi_allocations[RMDI_MAX_ALLOCS] = { 0u };
 
 /* Implementation function definitions */
-rmd_void _rmd_assertf_internal(const rmd_bool cond,
-                               const char *cond_str,
-                               const char *file, const int line,
-                               const char *fmt, ...)
+static rmd_void _rmdi_assertf_internal(const rmd_bool cond,
+                                       const char *cond_str,
+                                       const char *file, const int line,
+                                       const char *fmt, ...)
 {
         if (!(RMD_ENABLE_ASSERTS))
                 return;
@@ -120,17 +134,17 @@ rmd_void _rmd_assertf_internal(const rmd_bool cond,
                 return;
 
         if (!cond_str) {
-                fprintf(stderr, "_rmd_assertf_internal(): no cond string\n");
+                fprintf(stderr, "_rmdi_assertf_internal(): no cond string\n");
                 return;
         }
 
         if (!file) {
-                fprintf(stderr, "_rmd_assertf_internal(): no file name\n");
+                fprintf(stderr, "_rmdi_assertf_internal(): no file name\n");
                 return;
         }
 
         if (line < 0) {
-                fprintf(stderr, "_rmd_assertf_internal(): line num negative\n");
+                fprintf(stderr, "_rmdi_assertf_internal(): line num negative\n");
                 return;
         }
 
@@ -177,7 +191,13 @@ rmd_void rose_mem_debugger_terminate(void)
 
                 a = rmdi_allocations + i;
 
-                if (a->ptr || a->size || a->in_use) {
+                if (a->ptr) {
+                        rmd_assertf(a->size, "Pointer <%p> is allocated, "
+                                             "and should have size, "
+                                             "but doesn't.", a->ptr);
+                        rmd_assertf(a->in_use, "Pointer <%p> is allocated "
+                                               "and has size %lu, but is not "
+                                               "marked as `in_use`.\n", a->ptr);
                         rmd_free(a->ptr);
                         a->ptr    = NULL;
                         a->size   = 0u;
@@ -191,7 +211,7 @@ rmd_void rose_mem_debugger_terminate(void)
         rmdi_is_init         = RMD_FALSE;
 }
 
-struct rmdi_allocation *_rmdi_get_first_available_slot(void)
+static struct rmdi_allocation *_rmdi_get_first_available_slot(void)
 {
         for (rmd_size i = 0u; i < RMDI_MAX_ALLOCS; ++i) {
                 struct rmdi_allocation *a;
@@ -206,6 +226,16 @@ struct rmdi_allocation *_rmdi_get_first_available_slot(void)
         return NULL;
 }
 
+static __inline rmd_void *_rmdi_system_malloc(rmd_size sz)
+{
+        return malloc(sz);
+}
+
+static __inline rmd_void _rmdi_system_free(rmd_void *ptr)
+{
+        free(ptr);
+}
+
 rmd_void *rmd_malloc(rmd_size sz)
 {
         struct rmdi_allocation *a;
@@ -217,12 +247,18 @@ rmd_void *rmd_malloc(rmd_size sz)
         a = _rmdi_get_first_available_slot();
         rmd_assertm(a != NULL, "Couldn't find allocation slot!");
 
-        a->ptr = malloc(sz);
+        a->ptr = _rmdi_system_malloc(sz);
 
         rmd_assertm(a->ptr != NULL, "Allocation pointer failed to malloc()!");
 
         a->size = sz;
 
+        /*
+         * FIXME: This should print out a whole page of
+         * debug shit including all the currently allocated
+         * blocks, where (and possibly when) they were allocated,
+         * and probably some other shit. This is more for later though
+         */
         ++rmdi_num_allocations;
         rmd_assertf(rmdi_num_allocations < RMDI_MAX_ALLOCS,
                     "Too many allocations (%lu)!\n", rmdi_num_allocations);
@@ -239,7 +275,18 @@ rmd_void *rmd_malloc(rmd_size sz)
 
 rmd_void rmd_free(rmd_void *ptr)
 {
-        /* FIXME: Loop through allocations instead of integers */
+        rmd_assertf(ptr != NULL, "Trying to free a NULL pointer <%p>!", ptr);
+
+        /*
+         * FIXME:
+         * So, this currently just does a linear search through
+         * all the allocated blocks, which is fine, but at some point,
+         * if I wanna make this run better, it would be a good idea
+         * to optimize this at some point with a hash table or some shit. :3
+         *
+         * This could be a subject of premature optimization, so
+         * don't worry about it too much for now. :D
+         */
         for (rmd_size i = 0u; i < RMDI_MAX_ALLOCS; ++i) {
                 struct rmdi_allocation *a;
 
@@ -247,7 +294,7 @@ rmd_void rmd_free(rmd_void *ptr)
                 if (!a->in_use || ptr != a->ptr)
                         continue;
 
-                free(a->ptr);
+                _rmdi_system_free(a->ptr);
 
                 --rmdi_num_allocations;
                 rmdi_bytes_allocated -= a->size;
