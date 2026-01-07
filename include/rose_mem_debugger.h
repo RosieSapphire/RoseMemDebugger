@@ -19,7 +19,6 @@
  *
  * Some examples are:
  * - RMD_ENABLE_WRAPPING
- * - RMD_NO_INCLUDE_STDDEF
  * - RMD_DISABLE_ASSERTS
  * - RMD_MAX_ALLOCS
  * - RMD_STRICT_FREE
@@ -29,11 +28,14 @@
  * free to look through the code for right now. lmao
  */
 
-/* Defines */
-#ifndef RMD_NO_INCLUDE_STDDEF
+/* Includes */
 #include <stddef.h>
-#endif /* RMD_NO_INCLUDE_STDDEF */
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <string.h>
 
+/* Defines */
 #ifndef RMD_MAX_ALLOCS
 #define RMD_MAX_ALLOCS 4096
 #endif /* RMD_MAX_ALLOCS */
@@ -119,12 +121,6 @@ extern rmd_void rmd_print_heap_usage(void);
 #else /* RMD_IMPLEMENTATION_GAURD */
 #error "RMD_IMPLEMENTATION is defined more than once!"
 #endif /* RMD_IMPLEMENTATION_GAURD */
-
-/* Implementation includes */
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <string.h>
 
 /* Implementation types and structs */
 struct rmdi_block {
@@ -310,6 +306,14 @@ rmd_void *_rmdi_malloc_internal(rmd_size sz, const char *file_name,
  * I've noticed this function looks almost identical
  * to `_rmdi_get_first_available_slot()`, so I wonder
  * if there's a way to integrate them. Probably not a big concern rn tho. lol
+ *
+ * ALSO, NOTE:
+ * This function does not account for:
+ * - freeing a random pointer
+ * - freeing a pointer allocated before init (which shouldn't happen anyway)
+ * - freeing memory from another allocator (obviously, I think)
+ *
+ * So, uh... user beware...?
  */
 static struct rmdi_block *_rmdi_is_double_free(rmd_void *ptr_trying_free)
 {
@@ -431,6 +435,11 @@ rmd_void rmd_print_heap_usage(void)
  * outside implementation, but still inside header.
  */
 #ifdef RMD_ENABLE_WRAPPING
+/*
+ * FIXME:
+ * Eventually find a better way to do this. This fucks
+ * with 3rd party headers and other parts of the program.
+ */
 #define malloc(sz) rmd_malloc(sz)
 #define free(ptr) rmd_free(ptr)
 #endif /* RMD_ENABLE_WRAPPING */
