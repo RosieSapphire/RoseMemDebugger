@@ -94,8 +94,18 @@ extern rmd_void rmd_free(rmd_void *ptr);
 
 extern rmd_void rmd_print_heap_usage(void);
 
-/* FIXME: TMP */
-#if 1
+/*
+ * NOTE:
+ * Okay, the only reason that I have this here is
+ * because of the way my syntax highlighter or LSP
+ * or whatever works; it'll only un-grey the code
+ * below if the macro is enabled.
+ *
+ * Unfortunately, I have a bad habit of leaving
+ * this on when committing, so I am just making a note
+ * of this stupid bullshit right now. lmfao
+ */
+#if 0
 #define RMD_IMPLEMENTATION
 #endif
 
